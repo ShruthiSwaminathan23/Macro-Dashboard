@@ -37,72 +37,74 @@ COUNTRIES = {
 # Business Confidence: OECD BSCICP02 composite manufacturing indicator (% balance)
 # Consumer Confidence: OECD CSCICP02 composite consumer indicator (% balance)
 #
+# GDP series: pre-calculated YoY growth rates from OECD via FRED (format: [CC]GDPRQPSMEI)
+# No manual YoY computation needed — values are already % change vs same quarter prior year
 FRED_SERIES = {
     "UK": {
-        "gdp":     "CLVMNACSCAB1GQUK",   # Eurostat Real GDP, SA, quarterly
-        "cpi":     "GBRCPIALLMINMEI",     # OECD CPI all items, monthly
-        "unemp":   "UNRTGBR156NSTS",      # Harmonised unemployment rate, monthly
-        "bci":     "BSCICP02GBM460S",     # OECD Business Confidence, monthly
-        "cci":     "CSCICP02GBM460S",     # OECD Consumer Confidence, monthly
+        "gdp":     "GBRGDPRQPSMEI",      # OECD GDP YoY %, quarterly (Q4 2025 = ~1.0%)
+        "cpi":     "GBRCPIALLMINMEI",
+        "unemp":   "UNRTGBR156NSTS",
+        "bci":     "BSCICP02GBM460S",
+        "cci":     "CSCICP02GBM460S",
     },
     "Germany": {
-        "gdp":     "CLVMNACSCAB1GQDE",   # Eurostat Real GDP
+        "gdp":     "DEUGDPRQPSMEI",
         "cpi":     "DEUCPIALLMINMEI",
         "unemp":   "LMUNRRTTDEM156S",
         "bci":     "BSCICP02DEM460S",
         "cci":     "CSCICP02DEM460S",
     },
     "Netherlands": {
-        "gdp":     "CLVMNACSCAB1GQNL",
+        "gdp":     "NLDGDPRQPSMEI",
         "cpi":     "NLDCPIALLMINMEI",
         "unemp":   "LMUNRRTTNEM156S",
         "bci":     "BSCICP02NLM460S",
         "cci":     "CSCICP02NLM460S",
     },
     "France": {
-        "gdp":     "CLVMNACSCAB1GQFR",
+        "gdp":     "FRAGDPRQPSMEI",
         "cpi":     "FRACPIALLMINMEI",
         "unemp":   "LMUNRRTTFRM156S",
         "bci":     "BSCICP02FRM460S",
         "cci":     "CSCICP02FRM460S",
     },
     "Poland": {
-        "gdp":     "CLVMNACSCAB1GQPL",
+        "gdp":     "POLGDPRQPSMEI",
         "cpi":     "POLCPIALLMINMEI",
         "unemp":   "LMUNRRTTPLM156S",
         "bci":     "BSCICP02PLM460S",
         "cci":     "CSCICP02PLM460S",
     },
     "Belgium": {
-        "gdp":     "CLVMNACSCAB1GQBE",
+        "gdp":     "BELGDPRQPSMEI",
         "cpi":     "BELCPIALLMINMEI",
         "unemp":   "LMUNRRTTBEM156S",
         "bci":     "BSCICP02BEM460S",
         "cci":     "CSCICP02BEM460S",
     },
     "Australia": {
-        "gdp":     "CLVMNACSCAB1GQAU",
+        "gdp":     "AUSGDPRQPSMEI",
         "cpi":     "AUSCPIALLMINMEI",
         "unemp":   "LMUNRRTTAUM156S",
-        "bci":     "BSCICP02AUQ460S",    # Quarterly for Australia
+        "bci":     "BSCICP02AUQ460S",
         "cci":     "CSCICP02AUM460S",
     },
     "New Zealand": {
-        "gdp":     "CLVMNACSCAB1GQNZ",
+        "gdp":     "NZLGDPRQPSMEI",
         "cpi":     "NZLCPIALLMINMEI",
         "unemp":   "LMUNRRTTNZM156S",
-        "bci":     "BSCICP02NZQ460S",    # Quarterly for NZ
+        "bci":     "BSCICP02NZQ460S",
         "cci":     "CSCICP02NZM460S",
     },
     "Mexico": {
-        "gdp":     "CLVMNACSCAB1GQMX",
+        "gdp":     "MEXGDPRQPSMEI",
         "cpi":     "MEXCPIALLMINMEI",
         "unemp":   "LMUNRRTTMXM156S",
         "bci":     "BSCICP02MXM460S",
         "cci":     "CSCICP02MXM460S",
     },
     "Denmark": {
-        "gdp":     "CLVMNACSCAB1GQDK",
+        "gdp":     "DNKGDPRQPSMEI",
         "cpi":     "DNKCPIALLMINMEI",
         "unemp":   "LMUNRRTTDKM156S",
         "bci":     "BSCICP02DKM460S",
@@ -160,9 +162,8 @@ def yoy_pct(records, lag=4):
 def build_all(api_key):
     result = {}
     for country, ids in FRED_SERIES.items():
-        # GDP — quarterly index → YoY growth
-        gdp_raw = fetch_fred(ids["gdp"], api_key, freq="q")
-        gdp = yoy_pct(gdp_raw, lag=4)
+        # GDP — already pre-calculated YoY growth rate from OECD via FRED
+        gdp = fetch_fred(ids["gdp"], api_key, freq="q")
 
         # CPI — monthly index → YoY inflation
         cpi_raw = fetch_fred(ids["cpi"], api_key, freq="m")
