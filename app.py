@@ -402,7 +402,7 @@ else:
         st.plotly_chart(dark(fig_bkr), use_container_width=True)
         latest_bkr = bkr_records[-1]
         st.caption(
-            f"Source: Eurostat (sts\_rb\_q) · Index 2015=100, seasonally adjusted · "
+            f"Source: Eurostat (sts_rb_q) · Index 2015=100, seasonally adjusted · "
             f"Latest: {latest_bkr['date']} = {latest_bkr['value']:.0f} "
             f"({'above' if latest_bkr['value'] > 100 else 'below'} 2015 baseline)"
         )
@@ -448,5 +448,8 @@ else:
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
-st.caption("**Sources:** Economic data via FRED (Federal Reserve Bank of St. Louis) — underlying data from Eurostat, OECD, and IMF. Bankruptcy data via Eurostat API (sts\_rb\_q). Interest rates from central bank websites, updated monthly. AI summaries by Anthropic Claude.  
-**Note:** Bankruptcy data is available for EU countries and the UK only. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico.")
+st.caption("""
+**Sources:** Economic data via FRED (Federal Reserve Bank of St. Louis) — underlying data from Eurostat, OECD, and IMF. Bankruptcy data via Eurostat API (sts_rb_q). Interest rates from central bank websites, updated monthly. AI summaries by Anthropic Claude.
+
+**Note:** Bankruptcy data is available for EU countries and the UK only. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico.
+""")
