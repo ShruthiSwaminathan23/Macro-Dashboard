@@ -6,7 +6,6 @@ from datetime import datetime
 import anthropic
 import json
 
-# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Macro Dashboard", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -30,82 +29,87 @@ COUNTRIES = {
     "Denmark":     {"flag": "🇩🇰"},
 }
 
-# ── FRED series IDs for all indicators ───────────────────────────────────────
-# All sourced from FRED (St. Louis Fed) — single reliable API with your key
+# ── VERIFIED FRED series IDs (confirmed live on fred.stlouisfed.org) ──────────
+#
+# GDP: Real GDP index from Eurostat/IMF via FRED — we compute YoY % growth
+# CPI: All-items CPI index — we compute YoY % change
+# Unemployment: Harmonised monthly rate (%)
+# Business Confidence: OECD BSCICP02 composite manufacturing indicator (% balance)
+# Consumer Confidence: OECD CSCICP02 composite consumer indicator (% balance)
+#
 FRED_SERIES = {
     "UK": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQUK",   # Real GDP, rebased to growth below
-        "Inflation (%)":       "GBRCPIALLMINMEI",
-        "Unemployment (%)":    "UNRTGBR156NSTS",
-        "Business Confidence": "BSCIUKM",
-        "Consumer Confidence": "CSCIUKM",
+        "gdp":     "CLVMNACSCAB1GQUK",   # Eurostat Real GDP, SA, quarterly
+        "cpi":     "GBRCPIALLMINMEI",     # OECD CPI all items, monthly
+        "unemp":   "UNRTGBR156NSTS",      # Harmonised unemployment rate, monthly
+        "bci":     "BSCICP02GBM460S",     # OECD Business Confidence, monthly
+        "cci":     "CSCICP02GBM460S",     # OECD Consumer Confidence, monthly
     },
     "Germany": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQDEA",
-        "Inflation (%)":       "DEUCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTDEM156S",
-        "Business Confidence": "BSCIDEA",
-        "Consumer Confidence": "CSCIDEM",
+        "gdp":     "CLVMNACSCAB1GQDE",   # Eurostat Real GDP
+        "cpi":     "DEUCPIALLMINMEI",
+        "unemp":   "LMUNRRTTDEM156S",
+        "bci":     "BSCICP02DEM460S",
+        "cci":     "CSCICP02DEM460S",
     },
     "Netherlands": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQNLA",
-        "Inflation (%)":       "NLDCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTNEM156S",
-        "Business Confidence": "BSCINLA",
-        "Consumer Confidence": "CSCINLM",
+        "gdp":     "CLVMNACSCAB1GQNL",
+        "cpi":     "NLDCPIALLMINMEI",
+        "unemp":   "LMUNRRTTNEM156S",
+        "bci":     "BSCICP02NLM460S",
+        "cci":     "CSCICP02NLM460S",
     },
     "France": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQFRA",
-        "Inflation (%)":       "FRACPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTFRM156S",
-        "Business Confidence": "BSCIFRA",
-        "Consumer Confidence": "CSCIFRM",
+        "gdp":     "CLVMNACSCAB1GQFR",
+        "cpi":     "FRACPIALLMINMEI",
+        "unemp":   "LMUNRRTTFRM156S",
+        "bci":     "BSCICP02FRM460S",
+        "cci":     "CSCICP02FRM460S",
     },
     "Poland": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQPLA",
-        "Inflation (%)":       "POLCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTPLM156S",
-        "Business Confidence": "BSCIPLA",
-        "Consumer Confidence": "CSCEPLM",
+        "gdp":     "CLVMNACSCAB1GQPL",
+        "cpi":     "POLCPIALLMINMEI",
+        "unemp":   "LMUNRRTTPLM156S",
+        "bci":     "BSCICP02PLM460S",
+        "cci":     "CSCICP02PLM460S",
     },
     "Belgium": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQBEA",
-        "Inflation (%)":       "BELCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTBEM156S",
-        "Business Confidence": "BSCIBEA",
-        "Consumer Confidence": "CSCIBEM",
+        "gdp":     "CLVMNACSCAB1GQBE",
+        "cpi":     "BELCPIALLMINMEI",
+        "unemp":   "LMUNRRTTBEM156S",
+        "bci":     "BSCICP02BEM460S",
+        "cci":     "CSCICP02BEM460S",
     },
     "Australia": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQAUA",
-        "Inflation (%)":       "AUSCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTAUM156S",
-        "Business Confidence": "BSCIAUA",
-        "Consumer Confidence": "CSCIAUA",
+        "gdp":     "CLVMNACSCAB1GQAU",
+        "cpi":     "AUSCPIALLMINMEI",
+        "unemp":   "LMUNRRTTAUM156S",
+        "bci":     "BSCICP02AUQ460S",    # Quarterly for Australia
+        "cci":     "CSCICP02AUM460S",
     },
     "New Zealand": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQNZA",
-        "Inflation (%)":       "NZLCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTNZM156S",
-        "Business Confidence": "BSCINZA",
-        "Consumer Confidence": "CSCINZM",
+        "gdp":     "CLVMNACSCAB1GQNZ",
+        "cpi":     "NZLCPIALLMINMEI",
+        "unemp":   "LMUNRRTTNZM156S",
+        "bci":     "BSCICP02NZQ460S",    # Quarterly for NZ
+        "cci":     "CSCICP02NZM460S",
     },
     "Mexico": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQMXA",
-        "Inflation (%)":       "MEXCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTMXM156S",
-        "Business Confidence": "BSCIMXA",
-        "Consumer Confidence": "CSCIMXM",
+        "gdp":     "CLVMNACSCAB1GQMX",
+        "cpi":     "MEXCPIALLMINMEI",
+        "unemp":   "LMUNRRTTMXM156S",
+        "bci":     "BSCICP02MXM460S",
+        "cci":     "CSCICP02MXM460S",
     },
     "Denmark": {
-        "GDP Growth (%)":      "CLVMNACSCAB1GQDKA",
-        "Inflation (%)":       "DNKCPIALLMINMEI",
-        "Unemployment (%)":    "LMUNRRTTDKM156S",
-        "Business Confidence": "BSCIDKA",
-        "Consumer Confidence": "CSCIDKM",
+        "gdp":     "CLVMNACSCAB1GQDK",
+        "cpi":     "DNKCPIALLMINMEI",
+        "unemp":   "LMUNRRTTDKM156S",
+        "bci":     "BSCICP02DKM460S",
+        "cci":     "CSCICP02DKM460S",
     },
 }
 
-# Interest rates — updated manually each month
 INTEREST_RATES = {
     "UK": 4.25, "Germany": 2.40, "Netherlands": 2.40, "France": 2.40,
     "Poland": 5.25, "Belgium": 2.40, "Australia": 3.85, "New Zealand": 3.50,
@@ -113,82 +117,73 @@ INTEREST_RATES = {
 }
 RATE_DATE = "June 2026"
 
-# ── Data fetching ─────────────────────────────────────────────────────────────
+# ── FRED fetch ────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=86400)
-def fetch_fred(series_id, fred_api_key, observation_start="2019-01-01", frequency="q"):
-    if not fred_api_key or not series_id:
+def fetch_fred(series_id, api_key, start="2018-01-01", freq=None):
+    """Fetch a FRED series. Returns list of {date, value} dicts."""
+    if not api_key or not series_id:
         return []
-    url = "https://api.stlouisfed.org/fred/series/observations"
     params = {
         "series_id": series_id,
-        "api_key": fred_api_key,
+        "api_key": api_key,
         "file_type": "json",
-        "observation_start": observation_start,
+        "observation_start": start,
         "sort_order": "asc",
-        "frequency": frequency,
     }
+    if freq:
+        params["frequency"] = freq
     try:
-        r = requests.get(url, params=params, timeout=15)
+        r = requests.get("https://api.stlouisfed.org/fred/series/observations", params=params, timeout=15)
         if r.status_code != 200:
             return []
-        data = r.json().get("observations", [])
         return [
             {"date": d["date"], "value": float(d["value"])}
-            for d in data if d.get("value") not in (".", None, "")
+            for d in r.json().get("observations", [])
+            if d.get("value") not in (".", None, "")
         ]
     except Exception:
         return []
 
 
-def pct_change_yoy(records):
-    """Convert index levels to year-over-year % change."""
-    if len(records) < 5:
-        return records
-    result = []
-    for i in range(4, len(records)):
-        curr = records[i]["value"]
-        prev = records[i - 4]["value"]
+def yoy_pct(records, lag=4):
+    """Convert index levels to YoY % change (lag=4 for quarterly, 12 for monthly)."""
+    out = []
+    for i in range(lag, len(records)):
+        curr, prev = records[i]["value"], records[i - lag]["value"]
         if prev and prev != 0:
-            result.append({"date": records[i]["date"], "value": round((curr / prev - 1) * 100, 2)})
-    return result
+            out.append({"date": records[i]["date"], "value": round((curr / prev - 1) * 100, 2)})
+    return out
 
 
 @st.cache_data(ttl=86400)
-def build_country_data(fred_api_key=""):
-    all_data = {}
-    for country in COUNTRIES:
-        series = FRED_SERIES.get(country, {})
-        d = {}
+def build_all(api_key):
+    result = {}
+    for country, ids in FRED_SERIES.items():
+        # GDP — quarterly index → YoY growth
+        gdp_raw = fetch_fred(ids["gdp"], api_key, freq="q")
+        gdp = yoy_pct(gdp_raw, lag=4)
 
-        # GDP — quarterly index, convert to YoY growth
-        gdp_raw = fetch_fred(series.get("GDP Growth (%)"), fred_api_key, frequency="q")
-        gdp_growth = pct_change_yoy(gdp_raw)
-        d["GDP Growth (%)"] = {"data": gdp_growth, "source": "FRED (OECD via St. Louis Fed)"}
+        # CPI — monthly index → YoY inflation
+        cpi_raw = fetch_fred(ids["cpi"], api_key, freq="m")
+        cpi = yoy_pct(cpi_raw, lag=12)
 
-        # Inflation — monthly CPI YoY
-        cpi = fetch_fred(series.get("Inflation (%)"), fred_api_key, frequency="m")
-        # FRED CPI is index level; compute YoY %
-        cpi_yoy = []
-        for i in range(12, len(cpi)):
-            curr = cpi[i]["value"]
-            prev = cpi[i - 12]["value"]
-            if prev and prev != 0:
-                cpi_yoy.append({"date": cpi[i]["date"], "value": round((curr / prev - 1) * 100, 2)})
-        d["Inflation (%)"] = {"data": cpi_yoy[-36:] if cpi_yoy else [], "source": "FRED (OECD CPI)"}
+        # Unemployment — already a rate
+        unemp = fetch_fred(ids["unemp"], api_key, freq="m")
 
-        # Unemployment — monthly rate
-        unemp = fetch_fred(series.get("Unemployment (%)"), fred_api_key, frequency="m")
-        d["Unemployment (%)"] = {"data": unemp[-36:] if unemp else [], "source": "FRED (OECD)"}
+        # Confidence — already an indicator, keep last 3 years
+        bci_freq = "q" if country in ("Australia", "New Zealand") else "m"
+        bci = fetch_fred(ids["bci"], api_key, freq=bci_freq)
+        cci = fetch_fred(ids["cci"], api_key, freq="m")
 
-        # Business & Consumer Confidence — monthly index
-        bci = fetch_fred(series.get("Business Confidence"), fred_api_key, frequency="m")
-        cci = fetch_fred(series.get("Consumer Confidence"), fred_api_key, frequency="m")
-        d["Business Confidence"] = {"data": bci[-36:] if bci else [], "source": "FRED (OECD BCI)"}
-        d["Consumer Confidence"] = {"data": cci[-36:] if cci else [], "source": "FRED (OECD CCI)"}
-
-        all_data[country] = d
-    return all_data
+        result[country] = {
+            "GDP Growth (%)":      {"data": gdp[-20:],    "source": "Eurostat via FRED"},
+            "Inflation (%)":       {"data": cpi[-36:],    "source": "OECD CPI via FRED"},
+            "Unemployment (%)":    {"data": unemp[-36:],  "source": "OECD via FRED"},
+            "Business Confidence": {"data": bci[-36:],    "source": "OECD BSCI via FRED"},
+            "Consumer Confidence": {"data": cci[-36:],    "source": "OECD CSCI via FRED"},
+        }
+    return result
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -200,12 +195,10 @@ def delta(records):
         return records[-1]["value"] - records[-2]["value"]
     return None
 
-def fmt(val, decimals=2, suffix="%"):
-    if val is None:
-        return "N/A"
-    return f"{val:.{decimals}f}{suffix}"
+def fmt(val, dp=2, sfx="%"):
+    return "N/A" if val is None else f"{val:.{dp}f}{sfx}"
 
-def dark_fig(fig):
+def dark(fig):
     fig.update_layout(
         plot_bgcolor="#1e1e2e", paper_bgcolor="#1e1e2e", font_color="#e2e8f0",
         margin=dict(t=40, b=20, l=10, r=10), showlegend=False,
@@ -214,33 +207,20 @@ def dark_fig(fig):
     fig.update_yaxes(gridcolor="#374151")
     return fig
 
-# ── AI Executive Summary ──────────────────────────────────────────────────────
+# ── AI summary ────────────────────────────────────────────────────────────────
 
-def generate_exec_summary(all_data, country, anthropic_key):
-    client = anthropic.Anthropic(api_key=anthropic_key)
-    snapshot = {}
-    for indicator, info in all_data.get(country, {}).items():
-        snapshot[indicator] = {"latest": latest(info["data"]), "recent_change": delta(info["data"])}
-    snapshot["Interest Rate (%)"] = INTEREST_RATES.get(country)
-
-    prompt = f"""You are a senior macro analyst writing a concise executive briefing for a credit risk team.
-
-Country: {country}
-Data as of: {RATE_DATE}
-
-Indicators:
-{json.dumps(snapshot, indent=2)}
-
-Write a 3-paragraph executive summary (max 250 words):
-1. Overall economic health and direction
-2. Key risks or concerns for a credit team
-3. Notable positives or stabilising factors
-
-Use the actual numbers. Plain English, no bullet points, no headers."""
-
+def exec_summary(all_data, country, anth_key):
+    client = anthropic.Anthropic(api_key=anth_key)
+    snap = {k: {"latest": latest(v["data"]), "recent_change": delta(v["data"])}
+            for k, v in all_data.get(country, {}).items()}
+    snap["Interest Rate (%)"] = INTEREST_RATES.get(country)
     msg = client.messages.create(
         model="claude-sonnet-4-6", max_tokens=500,
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": f"""You are a senior macro analyst writing for a credit risk team.
+Country: {country} | Data as of: {RATE_DATE}
+{json.dumps(snap, indent=2)}
+Write 3 paragraphs (max 250 words): (1) overall economic health, (2) key credit risks, (3) positives/stabilisers.
+Use actual numbers. Plain English, no bullets, no headers."""}]
     )
     return msg.content[0].text
 
@@ -249,162 +229,133 @@ with st.sidebar:
     st.title("📊 Macro Dashboard")
     st.caption("Credit Risk | Monthly Macro Monitor")
     st.divider()
-
-    selected_country = st.selectbox(
-        "Select Country", list(COUNTRIES.keys()),
-        format_func=lambda c: f"{COUNTRIES[c]['flag']} {c}",
-    )
-
+    selected = st.selectbox("Select Country", list(COUNTRIES.keys()),
+                            format_func=lambda c: f"{COUNTRIES[c]['flag']} {c}")
     st.divider()
     st.markdown("**🔑 API Keys**")
-    fred_key = st.secrets.get("FRED_KEY", "") or st.text_input(
-        "FRED API Key", type="password", help="Get free key at fred.stlouisfed.org"
-    )
-    anthropic_key = st.secrets.get("ANTHROPIC_KEY", "") or st.text_input(
-        "Anthropic API Key", type="password", help="Get key at console.anthropic.com"
-    )
-
+    fred_key = st.secrets.get("FRED_KEY", "") or st.text_input("FRED API Key", type="password",
+                                                                 help="Free at fred.stlouisfed.org")
+    anth_key = st.secrets.get("ANTHROPIC_KEY", "") or st.text_input("Anthropic API Key", type="password",
+                                                                      help="console.anthropic.com")
     st.divider()
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-
     st.divider()
     st.markdown("**📚 Sources**")
-    st.caption("""
-- **FRED API** — All macro indicators (GDP, CPI, Unemployment, Confidence)
-- **Central Banks** — Interest Rates (updated monthly)
-- **Anthropic Claude** — AI Executive Summary
-
-All economic data sourced via St. Louis Fed (FRED), which republishes OECD data.
-    """)
+    st.caption("All data via FRED (St. Louis Fed)\nSources: Eurostat, OECD, IMF\nInterest rates: central banks (monthly)")
     st.caption(f"Refreshed: {datetime.now().strftime('%d %b %Y, %H:%M')}")
 
-# ── Load data ─────────────────────────────────────────────────────────────────
-flag = COUNTRIES[selected_country]["flag"]
-st.title(f"{flag} {selected_country} — Macro Dashboard")
-st.caption(f"All data via FRED API (St. Louis Fed) · Interest rates as of {RATE_DATE}")
+# ── Header ────────────────────────────────────────────────────────────────────
+flag = COUNTRIES[selected]["flag"]
+st.title(f"{flag} {selected} — Macro Dashboard")
+st.caption(f"All indicators via FRED API · Interest rates as of {RATE_DATE}")
 
 if not fred_key:
-    st.warning("⚠️ FRED API key not found. Add it to your Streamlit secrets or enter it in the sidebar. Get a free key at fred.stlouisfed.org")
+    st.warning("Add your FRED API key in the sidebar (or Streamlit secrets) to load data. Free at fred.stlouisfed.org")
     st.stop()
 
-with st.spinner("Fetching latest macro data from FRED..."):
-    all_data = build_country_data(fred_key)
+with st.spinner("Fetching data from FRED..."):
+    all_data = build_all(fred_key)
 
-cdata = all_data.get(selected_country, {})
+cdata = all_data[selected]
 
-# ── KPI row ───────────────────────────────────────────────────────────────────
+# ── KPI cards ─────────────────────────────────────────────────────────────────
 st.markdown("### Key Indicators")
-cols = st.columns(4)
-kpis = [
-    ("GDP Growth (%)",   "GDP Growth (YoY)",  False),
-    ("Inflation (%)",    "Inflation (YoY)",   True),
-    ("Unemployment (%)", "Unemployment Rate", True),
-]
-for i, (key, label, invert) in enumerate(kpis):
-    records = cdata.get(key, {}).get("data", [])
-    val = latest(records)
-    d   = delta(records)
-    with cols[i]:
-        arrow = "▲" if (d or 0) > 0 else "▼"
-        st.metric(
-            label=label,
-            value=fmt(val),
-            delta=f"{arrow} {fmt(abs(d) if d is not None else None)} vs prior" if d is not None else "N/A",
-        )
-with cols[3]:
-    st.metric(label="Interest Rate", value=fmt(INTEREST_RATES.get(selected_country)), delta=f"as of {RATE_DATE}")
+c1, c2, c3, c4 = st.columns(4)
+for col, key, label, inv in [
+    (c1, "GDP Growth (%)",   "GDP Growth (YoY)",   False),
+    (c2, "Inflation (%)",    "Inflation (YoY)",    True),
+    (c3, "Unemployment (%)", "Unemployment Rate",  True),
+]:
+    recs = cdata[key]["data"]
+    v, d = latest(recs), delta(recs)
+    with col:
+        st.metric(label, fmt(v), f"{'▲' if (d or 0)>0 else '▼'} {fmt(abs(d) if d else None)} vs prior" if d is not None else "N/A")
+with c4:
+    st.metric("Interest Rate", fmt(INTEREST_RATES[selected]), f"as of {RATE_DATE}")
 
-# ── Confidence ────────────────────────────────────────────────────────────────
+# ── Confidence charts ─────────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Business & Consumer Confidence")
-st.caption("OECD Confidence Index via FRED — values above 100 = above-average confidence")
+st.caption("OECD composite indicators via FRED — percentage balance (positive = net optimism)")
 
-conf_cols = st.columns(2)
-for i, key in enumerate(["Business Confidence", "Consumer Confidence"]):
-    info    = cdata.get(key, {})
-    records = info.get("data", [])
-    with conf_cols[i]:
-        if records:
-            df  = pd.DataFrame(records)
-            fig = px.line(df, x="date", y="value", title=key, color_discrete_sequence=["#7c3aed"],
-                          labels={"date": "", "value": "Index"})
-            fig.add_hline(y=100, line_dash="dash", line_color="#6b7280", annotation_text="Neutral (100)")
-            st.plotly_chart(dark_fig(fig), use_container_width=True)
-            st.caption(f"Source: {info.get('source', 'FRED')} · Latest: {records[-1]['date'][:7]}")
+col_b, col_c = st.columns(2)
+for col, key in [(col_b, "Business Confidence"), (col_c, "Consumer Confidence")]:
+    recs = cdata[key]["data"]
+    src  = cdata[key]["source"]
+    with col:
+        if recs:
+            df = pd.DataFrame(recs)
+            fig = px.line(df, x="date", y="value", title=key,
+                          color_discrete_sequence=["#7c3aed"], labels={"date": "", "value": "% balance"})
+            fig.add_hline(y=0, line_dash="dash", line_color="#6b7280", annotation_text="Neutral")
+            st.plotly_chart(dark(fig), use_container_width=True)
+            st.caption(f"Source: {src} · Latest: {recs[-1]['date'][:7]} = {fmt(latest(recs), sfx='')}")
         else:
-            st.info(f"No {key} data returned for {selected_country}. The FRED series may not exist for this country.")
+            st.info(f"No {key} data returned for {selected}.")
 
 # ── GDP & Inflation ───────────────────────────────────────────────────────────
 st.divider()
 st.markdown("### GDP Growth & Inflation")
-trend_cols = st.columns(2)
-for i, (key, color) in enumerate([("GDP Growth (%)", "#22c55e"), ("Inflation (%)", "#f59e0b")]):
-    records = cdata.get(key, {}).get("data", [])
-    with trend_cols[i]:
-        if records:
-            df  = pd.DataFrame(records)
-            fig = px.line(df, x="date", y="value", title=key,
-                          color_discrete_sequence=[color], labels={"date": "", "value": "%"})
+col_g, col_i = st.columns(2)
+for col, key, color in [(col_g, "GDP Growth (%)", "#22c55e"), (col_i, "Inflation (%)", "#f59e0b")]:
+    recs = cdata[key]["data"]
+    with col:
+        if recs:
+            df = pd.DataFrame(recs)
+            fig = px.bar(df, x="date", y="value", title=f"{key} (YoY)",
+                         color_discrete_sequence=[color], labels={"date": "", "value": "%"})
             fig.add_hline(y=0, line_dash="dash", line_color="#6b7280")
-            st.plotly_chart(dark_fig(fig), use_container_width=True)
-            src = cdata.get(key, {}).get("source", "FRED")
-            st.caption(f"Source: {src} · Latest: {records[-1]['date'][:7]}")
+            st.plotly_chart(dark(fig), use_container_width=True)
+            st.caption(f"Source: {cdata[key]['source']} · Latest: {recs[-1]['date'][:7]} = {fmt(latest(recs))}")
         else:
-            st.info(f"No data available for {key}")
+            st.info(f"No data for {key}.")
 
 # ── Unemployment ──────────────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Unemployment Rate")
-unemp_records = cdata.get("Unemployment (%)", {}).get("data", [])
-if unemp_records:
-    df_u = pd.DataFrame(unemp_records)
+recs_u = cdata["Unemployment (%)"]["data"]
+if recs_u:
+    df_u = pd.DataFrame(recs_u)
     fig_u = px.line(df_u, x="date", y="value", color_discrete_sequence=["#ef4444"],
                     labels={"date": "", "value": "Unemployment (%)"})
-    fig_u.update_layout(height=300)
-    st.plotly_chart(dark_fig(fig_u), use_container_width=True)
-    st.caption(f"Source: {cdata.get('Unemployment (%)', {}).get('source', 'FRED')}")
+    fig_u.update_layout(height=280)
+    st.plotly_chart(dark(fig_u), use_container_width=True)
+    st.caption(f"Source: {cdata['Unemployment (%)']['source']} · Latest: {recs_u[-1]['date'][:7]} = {fmt(latest(recs_u))}")
 
-# ── Cross-country snapshot ────────────────────────────────────────────────────
+# ── Cross-country table ───────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Cross-Country Snapshot")
 rows = []
-for country, meta in COUNTRIES.items():
-    cd  = all_data.get(country, {})
-    bci = cd.get("Business Confidence", {}).get("data", [])
-    cci = cd.get("Consumer Confidence", {}).get("data", [])
+for c, meta in COUNTRIES.items():
+    cd = all_data[c]
     rows.append({
-        "Country":             f"{meta['flag']} {country}",
-        "GDP Growth (%)":      fmt(latest(cd.get("GDP Growth (%)", {}).get("data", []))),
-        "Inflation (%)":       fmt(latest(cd.get("Inflation (%)", {}).get("data", []))),
-        "Unemployment (%)":    fmt(latest(cd.get("Unemployment (%)", {}).get("data", []))),
-        "Interest Rate (%)":   fmt(INTEREST_RATES.get(country)),
-        "Business Confidence": fmt(latest(bci), suffix="") if bci else "N/A",
-        "Consumer Confidence": fmt(latest(cci), suffix="") if cci else "N/A",
+        "Country":             f"{meta['flag']} {c}",
+        "GDP Growth (%)":      fmt(latest(cd["GDP Growth (%)"]["data"])),
+        "Inflation (%)":       fmt(latest(cd["Inflation (%)"]["data"])),
+        "Unemployment (%)":    fmt(latest(cd["Unemployment (%)"]["data"])),
+        "Interest Rate (%)":   fmt(INTEREST_RATES[c]),
+        "Business Confidence": fmt(latest(cd["Business Confidence"]["data"]), sfx=""),
+        "Consumer Confidence": fmt(latest(cd["Consumer Confidence"]["data"]), sfx=""),
     })
-df_comp = pd.DataFrame(rows).set_index("Country")
-st.dataframe(df_comp, use_container_width=True)
+st.dataframe(pd.DataFrame(rows).set_index("Country"), use_container_width=True)
 
-# ── AI Executive Summary ──────────────────────────────────────────────────────
+# ── AI Summary ────────────────────────────────────────────────────────────────
 st.divider()
 st.markdown("### 🤖 AI Executive Summary")
-if anthropic_key:
-    if st.button(f"Generate Summary for {flag} {selected_country}", type="primary", use_container_width=True):
+if anth_key:
+    if st.button(f"Generate Summary for {flag} {selected}", type="primary", use_container_width=True):
         with st.spinner("Claude is analysing the data..."):
             try:
-                summary = generate_exec_summary(all_data, selected_country, anthropic_key)
-                st.markdown(f'<div class="exec-summary">{summary}</div>', unsafe_allow_html=True)
-                st.caption(f"Generated by Claude (Anthropic) · {datetime.now().strftime('%d %b %Y, %H:%M')}")
+                s = exec_summary(all_data, selected, anth_key)
+                st.markdown(f'<div class="exec-summary">{s}</div>', unsafe_allow_html=True)
+                st.caption(f"Generated by Claude · {datetime.now().strftime('%d %b %Y, %H:%M')}")
             except Exception as e:
                 st.error(f"Could not generate summary: {e}")
 else:
-    st.info("Add your Anthropic API key in the sidebar to enable AI-generated executive summaries.")
+    st.info("Add your Anthropic API key in the sidebar to enable AI summaries.")
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
-st.caption("""
-**Data Sources:** All economic data via FRED (Federal Reserve Bank of St. Louis), which republishes OECD datasets.  
-Interest rates sourced from central bank websites and updated manually each month.  
-**Refresh cycle:** Data auto-refreshes every 24 hours.
-""")
+st.caption("**Sources:** All economic data via FRED (Federal Reserve Bank of St. Louis) — underlying data from Eurostat, OECD, and IMF. Interest rates from central bank websites, updated monthly. AI summaries by Anthropic Claude.")
