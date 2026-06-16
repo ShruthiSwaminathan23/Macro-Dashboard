@@ -123,7 +123,7 @@ RATE_DATE = "June 2026"
 # dataset: sts_rb_q (quarterly bankruptcy declarations, index 2015=100)
 # Coverage: EU countries + UK. Australia, NZ, Mexico not available.
 EUROSTAT_CODES = {
-    "UK":          "UK",
+    "UK":          None,   # Not available — UK left Eurostat reporting post-Brexit
     "Germany":     "DE",
     "Netherlands": "NL",
     "France":      "FR",
@@ -135,7 +135,7 @@ EUROSTAT_CODES = {
     "New Zealand": None,
     "Mexico":      None,
 }
-NO_BANKRUPTCY_NOTE = "Bankruptcy data not available via Eurostat for this country. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico."
+NO_BANKRUPTCY_NOTE = "Bankruptcy data not available for this country. The UK left Eurostat's reporting framework after Brexit. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico."
 
 
 # ── FRED fetch ────────────────────────────────────────────────────────────────
@@ -519,5 +519,5 @@ st.divider()
 st.caption("""
 **Sources:** Economic data via FRED (Federal Reserve Bank of St. Louis) — underlying data from Eurostat, OECD, and IMF. Bankruptcy data via Eurostat API (sts_rb_q). Interest rates from central bank websites, updated monthly. AI summaries by Anthropic Claude.
 
-**Note:** Bankruptcy data is available for EU countries and the UK only. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico.
+**Note:** Bankruptcy data covers EU countries only (Germany, France, Netherlands, Belgium, Poland, Denmark). The UK stopped reporting to Eurostat after Brexit. No data available for Australia, New Zealand, or Mexico.
 """)
