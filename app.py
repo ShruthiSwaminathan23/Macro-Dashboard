@@ -234,10 +234,14 @@ with st.sidebar:
 
     st.divider()
     st.markdown("**🔑 API Keys**")
-    fred_key = st.text_input("FRED API Key (optional)", type="password",
-                              help="Get free key at fred.stlouisfed.org")
-    anthropic_key = st.text_input("Anthropic API Key", type="password",
-                                   help="Get key at console.anthropic.com")
+    fred_key = st.secrets.get("FRED_KEY", "") or st.text_input(
+        "FRED API Key (optional)", type="password",
+        help="Get free key at fred.stlouisfed.org"
+    )
+    anthropic_key = st.secrets.get("ANTHROPIC_KEY", "") or st.text_input(
+        "Anthropic API Key", type="password",
+        help="Get key at console.anthropic.com"
+    )
 
     st.divider()
     if st.button("🔄 Refresh Data", use_container_width=True):
