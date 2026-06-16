@@ -119,6 +119,25 @@ INTEREST_RATES = {
 }
 RATE_DATE = "June 2026"
 
+# ── Eurostat country codes for bankruptcy data ────────────────────────────────
+# dataset: sts_rb_q (quarterly bankruptcy declarations, index 2015=100)
+# Coverage: EU countries + UK. Australia, NZ, Mexico not available.
+EUROSTAT_CODES = {
+    "UK":          "UK",
+    "Germany":     "DE",
+    "Netherlands": "NL",
+    "France":      "FR",
+    "Poland":      "PL",
+    "Belgium":     "BE",
+    "Denmark":     "DK",
+    # Not available via Eurostat:
+    "Australia":   None,
+    "New Zealand": None,
+    "Mexico":      None,
+}
+NO_BANKRUPTCY_NOTE = "Bankruptcy data not available via Eurostat for this country. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico."
+
+
 # ── FRED fetch ────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=86400)
@@ -147,6 +166,32 @@ def fetch_fred(series_id, api_key, start="2018-01-01", freq=None):
     except Exception:
         return []
 
+@st.cache_data(ttl=86400)
+def fetch_eurostat_bankruptcy(geo_code, sinceTimePeriod="2019-Q1"):
+    """Fetch quarterly bankruptcy index from Eurostat sts_rb_q (2015=100)."""
+    if not geo_code:
+        return []
+    url = (
+        "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_rb_q"
+        f"?format=JSON&lang=en&indic_bt=CREA_BANK&s_adj=SCA&unit=I15&geo={geo_code}"
+        f"&sinceTimePeriod={sinceTimePeriod}"
+    )
+    try:
+        r = requests.get(url, timeout=15)
+        if r.status_code != 200:
+            return []
+        j = r.json()
+        # Extract time periods and values
+        time_vals = j["dimension"]["time"]["category"]["index"]   # {period: position}
+        values    = j["value"]                                     # {str(pos): value}
+        records = []
+        for period, pos in time_vals.items():
+            val = values.get(str(pos))
+            if val is not None:
+                records.append({"date": period, "value": round(float(val), 1)})
+        return sorted(records, key=lambda x: x["date"])
+    except Exception:
+        return []
 
 def yoy_pct(records, lag=4):
     """Convert index levels to YoY % change (lag=4 for quarterly, 12 for monthly)."""
@@ -336,6 +381,38 @@ if recs_u:
     st.plotly_chart(dark(fig_u), use_container_width=True)
     st.caption(f"Source: {cdata['Unemployment (%)']['source']} · Latest: {recs_u[-1]['date'][:7]} = {fmt(latest(recs_u))}")
 
+
+# ── Bankruptcy Index ──────────────────────────────────────────────────────────
+st.divider()
+st.markdown("### Bankruptcy Declarations")
+
+geo = EUROSTAT_CODES.get(selected)
+if geo is None:
+    st.info(f"⚠️ {NO_BANKRUPTCY_NOTE}")
+else:
+    bkr_records = cdata.get("Bankruptcy Index", {}).get("data", [])
+    if bkr_records:
+        df_bkr = pd.DataFrame(bkr_records)
+        fig_bkr = px.line(df_bkr, x="date", y="value",
+                          color_discrete_sequence=["#f97316"],
+                          labels={"date": "", "value": "Index (2015=100)"})
+        fig_bkr.add_hline(y=100, line_dash="dash", line_color="#6b7280",
+                          annotation_text="2015 baseline")
+        fig_bkr.update_layout(height=300)
+        st.plotly_chart(dark(fig_bkr), use_container_width=True)
+        latest_bkr = bkr_records[-1]
+        st.caption(
+            f"Source: Eurostat (sts\_rb\_q) · Index 2015=100, seasonally adjusted · "
+            f"Latest: {latest_bkr['date']} = {latest_bkr['value']:.0f} "
+            f"({'above' if latest_bkr['value'] > 100 else 'below'} 2015 baseline)"
+        )
+        st.caption(
+            "**How to read:** Values above 100 mean more bankruptcies than the 2015 average. "
+            "A rising trend signals deteriorating credit conditions."
+        )
+    else:
+        st.info("Bankruptcy data not yet available for this country from Eurostat.")
+
 # ── Cross-country table ───────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Cross-Country Snapshot")
@@ -350,6 +427,7 @@ for c, meta in COUNTRIES.items():
         "Interest Rate (%)":   fmt(INTEREST_RATES[c]),
         "Business Confidence": fmt(latest(cd["Business Confidence"]["data"]), sfx=""),
         "Consumer Confidence": fmt(latest(cd["Consumer Confidence"]["data"]), sfx=""),
+        "Bankruptcy Index":    fmt(latest(cd.get("Bankruptcy Index", {}).get("data", [])), sfx="") if EUROSTAT_CODES.get(c) else "N/A",
     })
 st.dataframe(pd.DataFrame(rows).set_index("Country"), use_container_width=True)
 
@@ -370,4 +448,5 @@ else:
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
-st.caption("**Sources:** All economic data via FRED (Federal Reserve Bank of St. Louis) — underlying data from Eurostat, OECD, and IMF. Interest rates from central bank websites, updated monthly. AI summaries by Anthropic Claude.")
+st.caption("**Sources:** Economic data via FRED (Federal Reserve Bank of St. Louis) — underlying data from Eurostat, OECD, and IMF. Bankruptcy data via Eurostat API (sts\_rb\_q). Interest rates from central bank websites, updated monthly. AI summaries by Anthropic Claude.  
+**Note:** Bankruptcy data is available for EU countries and the UK only. No standardised cross-country insolvency series exists for Australia, New Zealand, or Mexico.")
