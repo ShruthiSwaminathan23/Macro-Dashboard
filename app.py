@@ -168,30 +168,62 @@ def fetch_fred(series_id, api_key, start="2018-01-01", freq=None):
 
 @st.cache_data(ttl=86400)
 def fetch_eurostat_bankruptcy(geo_code, sinceTimePeriod="2019-Q1"):
-    """Fetch quarterly bankruptcy index from Eurostat sts_rb_q (2015=100)."""
+    """
+    Fetch quarterly bankruptcy declarations index from Eurostat sts_rb_q (2015=100).
+    Tries multiple parameter combinations to maximise country coverage.
+    """
     if not geo_code:
         return []
-    url = (
-        "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_rb_q"
-        f"?format=JSON&lang=en&indic_bt=CREA_BANK&s_adj=SCA&unit=I15&geo={geo_code}"
-        f"&sinceTimePeriod={sinceTimePeriod}"
-    )
-    try:
-        r = requests.get(url, timeout=15)
-        if r.status_code != 200:
-            return []
-        j = r.json()
-        # Extract time periods and values
-        time_vals = j["dimension"]["time"]["category"]["index"]   # {period: position}
-        values    = j["value"]                                     # {str(pos): value}
-        records = []
-        for period, pos in time_vals.items():
-            val = values.get(str(pos))
-            if val is not None:
-                records.append({"date": period, "value": round(float(val), 1)})
-        return sorted(records, key=lambda x: x["date"])
-    except Exception:
-        return []
+
+    # Parameter sets to try in order — different countries have different adjustment types
+    param_sets = [
+        # Total economy, seasonally adjusted
+        {"indic_bt": "BKRT", "nace_r2": "TOTAL", "s_adj": "SCA", "unit": "I15"},
+        # Total economy, unadjusted
+        {"indic_bt": "BKRT", "nace_r2": "TOTAL", "s_adj": "NSA", "unit": "I15"},
+        # Industry excl construction, unadjusted (fallback — most widely available)
+        {"indic_bt": "BKRT", "nace_r2": "B-E",   "s_adj": "NSA", "unit": "I15"},
+    ]
+
+    base = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_rb_q"
+
+    for params in param_sets:
+        try:
+            query = (
+                f"{base}?format=JSON&lang=en"
+                f"&indic_bt={params['indic_bt']}"
+                f"&nace_r2={params['nace_r2']}"
+                f"&s_adj={params['s_adj']}"
+                f"&unit={params['unit']}"
+                f"&geo={geo_code}"
+                f"&sinceTimePeriod={sinceTimePeriod}"
+            )
+            r = requests.get(query, timeout=15)
+            if r.status_code != 200:
+                continue
+            j = r.json()
+
+            # Eurostat JSON-stat structure: dimension > time > category > index
+            dims = j.get("dimension", {})
+            time_dim = dims.get("time", {}).get("category", {}).get("index", {})
+            values = j.get("value", {})
+
+            if not time_dim or not values:
+                continue
+
+            records = []
+            for period, pos in time_dim.items():
+                val = values.get(str(pos))
+                if val is not None:
+                    records.append({"date": period, "value": round(float(val), 1)})
+
+            if records:
+                return sorted(records, key=lambda x: x["date"])
+
+        except Exception:
+            continue
+
+    return []
 
 def yoy_pct(records, lag=4):
     """Convert index levels to YoY % change (lag=4 for quarterly, 12 for monthly)."""
