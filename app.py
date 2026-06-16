@@ -172,8 +172,9 @@ def build_all(api_key):
         cpi_raw = fetch_fred(ids["cpi"], api_key, freq=cpi_freq)
         cpi = yoy_pct(cpi_raw, lag=cpi_lag)
 
-        # Unemployment — already a rate
-        unemp = fetch_fred(ids["unemp"], api_key, freq="m")
+        # Unemployment — NZ is quarterly only, all others monthly
+        unemp_freq = "q" if country == "New Zealand" else "m"
+        unemp = fetch_fred(ids["unemp"], api_key, freq=unemp_freq)
 
         # Confidence — already an indicator, keep last 3 years
         bci_freq = "q" if country in ("Australia", "New Zealand") else "m"
