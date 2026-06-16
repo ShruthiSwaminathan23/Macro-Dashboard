@@ -171,17 +171,17 @@ def fetch_eurostat_bankruptcy(geo_code, sinceTimePeriod="2019-Q1"):
     """
     Fetch quarterly bankruptcy declarations index from Eurostat sts_rb_q (2015=100).
     Tries multiple parameter combinations to maximise country coverage.
+
+    Eurostat JSON-stat is multi-dimensional. When filtering to a single country,
+    the flat value array is indexed by a product of ALL dimension sizes.
+    We must compute the correct flat index for each time period.
     """
     if not geo_code:
         return []
 
-    # Parameter sets to try in order — different countries have different adjustment types
     param_sets = [
-        # Total economy, seasonally adjusted
         {"indic_bt": "BKRT", "nace_r2": "TOTAL", "s_adj": "SCA", "unit": "I15"},
-        # Total economy, unadjusted
         {"indic_bt": "BKRT", "nace_r2": "TOTAL", "s_adj": "NSA", "unit": "I15"},
-        # Industry excl construction, unadjusted (fallback — most widely available)
         {"indic_bt": "BKRT", "nace_r2": "B-E",   "s_adj": "NSA", "unit": "I15"},
     ]
 
@@ -203,17 +203,47 @@ def fetch_eurostat_bankruptcy(geo_code, sinceTimePeriod="2019-Q1"):
                 continue
             j = r.json()
 
-            # Eurostat JSON-stat structure: dimension > time > category > index
-            dims = j.get("dimension", {})
-            time_dim = dims.get("time", {}).get("category", {}).get("index", {})
+            dims   = j.get("dimension", {})
             values = j.get("value", {})
+            ids    = j.get("id", [])      # ordered list of dimension names
+            sizes  = j.get("size", [])    # size of each dimension
 
-            if not time_dim or not values:
+            if not ids or not sizes or not values:
                 continue
 
+            # Build a stride map so we can compute the flat index for any combo
+            # stride[i] = product of sizes[i+1:]
+            strides = [1] * len(sizes)
+            for i in range(len(sizes) - 2, -1, -1):
+                strides[i] = strides[i + 1] * sizes[i + 1]
+
+            # For each dimension find position of the single filtered value (or 0)
+            fixed_positions = {}
+            for dim_name, stride in zip(ids, strides):
+                cat_index = dims.get(dim_name, {}).get("category", {}).get("index", {})
+                if len(cat_index) == 1:
+                    # Only one value present — this is a filtered dim; position is 0
+                    fixed_positions[dim_name] = 0
+                # time dim will have multiple values — we'll iterate over it
+
+            time_dim_name = ids[-1] if ids[-1] == "time" else next(
+                (n for n in ids if n == "time"), None)
+            if time_dim_name is None:
+                continue
+
+            time_index = dims[time_dim_name]["category"]["index"]   # {period: pos}
+            time_stride = strides[ids.index(time_dim_name)]
+
+            # Base offset from all non-time fixed dimensions
+            base_offset = 0
+            for dim_name, stride in zip(ids, strides):
+                if dim_name != time_dim_name:
+                    base_offset += fixed_positions.get(dim_name, 0) * stride
+
             records = []
-            for period, pos in time_dim.items():
-                val = values.get(str(pos))
+            for period, t_pos in time_index.items():
+                flat_idx = base_offset + t_pos * time_stride
+                val = values.get(str(flat_idx))
                 if val is not None:
                     records.append({"date": period, "value": round(float(val), 1)})
 
