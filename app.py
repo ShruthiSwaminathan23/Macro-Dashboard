@@ -294,6 +294,12 @@ def build_all(api_key):
             "Unemployment (%)":    {"data": unemp[-36:],  "source": "OECD via FRED"},
             "Business Confidence": {"data": bci[-36:],    "source": "OECD BSCI via FRED"},
             "Consumer Confidence": {"data": cci[-36:],    "source": "OECD CSCI via FRED"},
+
+            # Bankruptcy — Eurostat sts_rb_q (EU + UK only)
+            "Bankruptcy Index": {
+                "data": fetch_eurostat_bankruptcy(EUROSTAT_CODES.get(country))[-20:],
+                "source": "Eurostat (sts_rb_q)"
+            },
         }
     return result
 
