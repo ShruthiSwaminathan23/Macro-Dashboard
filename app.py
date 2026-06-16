@@ -2,20 +2,13 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime
 import anthropic
 import json
 
 # ── Page config ───────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Macro Dashboard",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="Macro Dashboard", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# ── Styling ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     .exec-summary { background: #1e1e2e; border-radius: 12px; padding: 24px; border: 1px solid #374151; line-height: 1.7; }
@@ -25,31 +18,91 @@ st.markdown("""
 
 # ── Countries ─────────────────────────────────────────────────────────────────
 COUNTRIES = {
-    "UK":          {"world_bank": "GB", "oecd": "GBR", "flag": "🇬🇧"},
-    "Germany":     {"world_bank": "DE", "oecd": "DEU", "flag": "🇩🇪"},
-    "Netherlands": {"world_bank": "NL", "oecd": "NLD", "flag": "🇳🇱"},
-    "France":      {"world_bank": "FR", "oecd": "FRA", "flag": "🇫🇷"},
-    "Poland":      {"world_bank": "PL", "oecd": "POL", "flag": "🇵🇱"},
-    "Belgium":     {"world_bank": "BE", "oecd": "BEL", "flag": "🇧🇪"},
-    "Australia":   {"world_bank": "AU", "oecd": "AUS", "flag": "🇦🇺"},
-    "New Zealand": {"world_bank": "NZ", "oecd": "NZL", "flag": "🇳🇿"},
-    "Mexico":      {"world_bank": "MX", "oecd": "MEX", "flag": "🇲🇽"},
-    "Denmark":     {"world_bank": "DK", "oecd": "DNK", "flag": "🇩🇰"},
+    "UK":          {"flag": "🇬🇧"},
+    "Germany":     {"flag": "🇩🇪"},
+    "Netherlands": {"flag": "🇳🇱"},
+    "France":      {"flag": "🇫🇷"},
+    "Poland":      {"flag": "🇵🇱"},
+    "Belgium":     {"flag": "🇧🇪"},
+    "Australia":   {"flag": "🇦🇺"},
+    "New Zealand": {"flag": "🇳🇿"},
+    "Mexico":      {"flag": "🇲🇽"},
+    "Denmark":     {"flag": "🇩🇰"},
 }
 
-# FRED series IDs for confidence indicators (primary source)
-# These are the official OECD BCI/CCI series republished on FRED — much more reliable
-FRED_CONFIDENCE = {
-    "UK":          {"Business Confidence": "BSCIUKM",  "Consumer Confidence": "CSCIUKM"},
-    "Germany":     {"Business Confidence": "BSCIDEA",  "Consumer Confidence": "CSCIDEM"},
-    "France":      {"Business Confidence": "BSCIFRA",  "Consumer Confidence": "CSCIFRM"},
-    "Australia":   {"Business Confidence": "BSCIAUA",  "Consumer Confidence": "CSCIAUA"},
-    "Mexico":      {"Business Confidence": "BSCIMXA",  "Consumer Confidence": "CSCIMXM"},
-    "Netherlands": {"Business Confidence": "BSCINLA",  "Consumer Confidence": "CSCINLM"},
-    "Poland":      {"Business Confidence": "BSCIPLA",  "Consumer Confidence": "CSCEPLM"},
-    "Belgium":     {"Business Confidence": "BSCIBEA",  "Consumer Confidence": "CSCIBEM"},
-    "New Zealand": {"Business Confidence": "BSCINZA",  "Consumer Confidence": "CSCINZM"},
-    "Denmark":     {"Business Confidence": "BSCIDKA",  "Consumer Confidence": "CSCIDKM"},
+# ── FRED series IDs for all indicators ───────────────────────────────────────
+# All sourced from FRED (St. Louis Fed) — single reliable API with your key
+FRED_SERIES = {
+    "UK": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQUK",   # Real GDP, rebased to growth below
+        "Inflation (%)":       "GBRCPIALLMINMEI",
+        "Unemployment (%)":    "UNRTGBR156NSTS",
+        "Business Confidence": "BSCIUKM",
+        "Consumer Confidence": "CSCIUKM",
+    },
+    "Germany": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQDEA",
+        "Inflation (%)":       "DEUCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTDEM156S",
+        "Business Confidence": "BSCIDEA",
+        "Consumer Confidence": "CSCIDEM",
+    },
+    "Netherlands": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQNLA",
+        "Inflation (%)":       "NLDCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTNEM156S",
+        "Business Confidence": "BSCINLA",
+        "Consumer Confidence": "CSCINLM",
+    },
+    "France": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQFRA",
+        "Inflation (%)":       "FRACPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTFRM156S",
+        "Business Confidence": "BSCIFRA",
+        "Consumer Confidence": "CSCIFRM",
+    },
+    "Poland": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQPLA",
+        "Inflation (%)":       "POLCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTPLM156S",
+        "Business Confidence": "BSCIPLA",
+        "Consumer Confidence": "CSCEPLM",
+    },
+    "Belgium": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQBEA",
+        "Inflation (%)":       "BELCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTBEM156S",
+        "Business Confidence": "BSCIBEA",
+        "Consumer Confidence": "CSCIBEM",
+    },
+    "Australia": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQAUA",
+        "Inflation (%)":       "AUSCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTAUM156S",
+        "Business Confidence": "BSCIAUA",
+        "Consumer Confidence": "CSCIAUA",
+    },
+    "New Zealand": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQNZA",
+        "Inflation (%)":       "NZLCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTNZM156S",
+        "Business Confidence": "BSCINZA",
+        "Consumer Confidence": "CSCINZM",
+    },
+    "Mexico": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQMXA",
+        "Inflation (%)":       "MEXCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTMXM156S",
+        "Business Confidence": "BSCIMXA",
+        "Consumer Confidence": "CSCIMXM",
+    },
+    "Denmark": {
+        "GDP Growth (%)":      "CLVMNACSCAB1GQDKA",
+        "Inflation (%)":       "DNKCPIALLMINMEI",
+        "Unemployment (%)":    "LMUNRRTTDKM156S",
+        "Business Confidence": "BSCIDKA",
+        "Consumer Confidence": "CSCIDKM",
+    },
 }
 
 # Interest rates — updated manually each month
@@ -63,26 +116,7 @@ RATE_DATE = "June 2026"
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=86400)
-def fetch_world_bank(indicator_code, country_code, years=6):
-    url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_code}"
-    params = {"format": "json", "mrv": years, "per_page": 10}
-    try:
-        r = requests.get(url, params=params, timeout=10)
-        data = r.json()
-        if len(data) > 1 and data[1]:
-            records = [
-                {"year": int(d["date"]), "value": d["value"]}
-                for d in data[1] if d["value"] is not None
-            ]
-            return sorted(records, key=lambda x: x["year"])
-    except Exception:
-        pass
-    return []
-
-
-@st.cache_data(ttl=86400)
-def fetch_fred(series_id, fred_api_key, observation_start="2020-01-01"):
-    """Fetch monthly series from FRED."""
+def fetch_fred(series_id, fred_api_key, observation_start="2019-01-01", frequency="q"):
     if not fred_api_key or not series_id:
         return []
     url = "https://api.stlouisfed.org/fred/series/observations"
@@ -91,99 +125,79 @@ def fetch_fred(series_id, fred_api_key, observation_start="2020-01-01"):
         "api_key": fred_api_key,
         "file_type": "json",
         "observation_start": observation_start,
-        "frequency": "m",
         "sort_order": "asc",
+        "frequency": frequency,
     }
     try:
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url, params=params, timeout=15)
         if r.status_code != 200:
             return []
         data = r.json().get("observations", [])
         return [
             {"date": d["date"], "value": float(d["value"])}
-            for d in data if d["value"] not in (".", None)
+            for d in data if d.get("value") not in (".", None, "")
         ]
     except Exception:
         return []
 
 
-@st.cache_data(ttl=86400)
-def fetch_oecd_confidence(oecd_code, indicator="BSCI"):
-    """
-    Fallback: pull BCI or CCI from OECD's newer data-explorer API.
-    indicator: BSCI (business) or CSCI (consumer)
-    """
-    url = "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI"
-    try:
-        path = f"/{oecd_code}.{indicator}.AA.LTRENDIDX/all"
-        r = requests.get(
-            url + path,
-            headers={"Accept": "application/vnd.sdmx.data+json;version=2"},
-            params={"startPeriod": "2020-01", "dimensionAtObservation": "TIME_PERIOD"},
-            timeout=15,
-        )
-        if r.status_code == 200:
-            j = r.json()
-            obs = j["data"]["dataSets"][0]["observations"]
-            periods = j["data"]["structures"][0]["dimensions"]["observation"][0]["values"]
-            records = []
-            for k, v in obs.items():
-                idx = int(k)
-                if idx < len(periods) and v[0] is not None:
-                    records.append({"date": periods[idx]["id"], "value": v[0]})
-            return sorted(records, key=lambda x: x["date"])
-    except Exception:
-        pass
-    return []
+def pct_change_yoy(records):
+    """Convert index levels to year-over-year % change."""
+    if len(records) < 5:
+        return records
+    result = []
+    for i in range(4, len(records)):
+        curr = records[i]["value"]
+        prev = records[i - 4]["value"]
+        if prev and prev != 0:
+            result.append({"date": records[i]["date"], "value": round((curr / prev - 1) * 100, 2)})
+    return result
 
-
-def fetch_confidence(country, indicator_key, fred_api_key):
-    """
-    Try FRED first (most reliable). Fall back to OECD API.
-    indicator_key: 'Business Confidence' or 'Consumer Confidence'
-    """
-    fred_id = FRED_CONFIDENCE.get(country, {}).get(indicator_key)
-    records = fetch_fred(fred_id, fred_api_key) if fred_id else []
-
-    if not records:
-        oecd_code = COUNTRIES[country]["oecd"]
-        oecd_ind = "BSCI" if "Business" in indicator_key else "CSCI"
-        records = fetch_oecd_confidence(oecd_code, oecd_ind)
-        source = "OECD"
-    else:
-        source = "FRED (OECD series)"
-
-    return records, source
-
-
-# ── Build all country data ────────────────────────────────────────────────────
 
 @st.cache_data(ttl=86400)
 def build_country_data(fred_api_key=""):
     all_data = {}
-    for country, meta in COUNTRIES.items():
-        wb = meta["world_bank"]
+    for country in COUNTRIES:
+        series = FRED_SERIES.get(country, {})
         d = {}
-        d["GDP Growth (%)"]   = {"data": fetch_world_bank("NY.GDP.MKTP.KD.ZG", wb), "source": "World Bank"}
-        d["Inflation (%)"]    = {"data": fetch_world_bank("FP.CPI.TOTL.ZG", wb),    "source": "World Bank"}
-        d["Unemployment (%)"] = {"data": fetch_world_bank("SL.UEM.TOTL.ZS", wb),    "source": "World Bank"}
 
-        bci_records, bci_source = fetch_confidence(country, "Business Confidence", fred_api_key)
-        cci_records, cci_source = fetch_confidence(country, "Consumer Confidence", fred_api_key)
-        d["Business Confidence"] = {"data": bci_records, "source": bci_source}
-        d["Consumer Confidence"] = {"data": cci_records, "source": cci_source}
+        # GDP — quarterly index, convert to YoY growth
+        gdp_raw = fetch_fred(series.get("GDP Growth (%)"), fred_api_key, frequency="q")
+        gdp_growth = pct_change_yoy(gdp_raw)
+        d["GDP Growth (%)"] = {"data": gdp_growth, "source": "FRED (OECD via St. Louis Fed)"}
+
+        # Inflation — monthly CPI YoY
+        cpi = fetch_fred(series.get("Inflation (%)"), fred_api_key, frequency="m")
+        # FRED CPI is index level; compute YoY %
+        cpi_yoy = []
+        for i in range(12, len(cpi)):
+            curr = cpi[i]["value"]
+            prev = cpi[i - 12]["value"]
+            if prev and prev != 0:
+                cpi_yoy.append({"date": cpi[i]["date"], "value": round((curr / prev - 1) * 100, 2)})
+        d["Inflation (%)"] = {"data": cpi_yoy[-36:] if cpi_yoy else [], "source": "FRED (OECD CPI)"}
+
+        # Unemployment — monthly rate
+        unemp = fetch_fred(series.get("Unemployment (%)"), fred_api_key, frequency="m")
+        d["Unemployment (%)"] = {"data": unemp[-36:] if unemp else [], "source": "FRED (OECD)"}
+
+        # Business & Consumer Confidence — monthly index
+        bci = fetch_fred(series.get("Business Confidence"), fred_api_key, frequency="m")
+        cci = fetch_fred(series.get("Consumer Confidence"), fred_api_key, frequency="m")
+        d["Business Confidence"] = {"data": bci[-36:] if bci else [], "source": "FRED (OECD BCI)"}
+        d["Consumer Confidence"] = {"data": cci[-36:] if cci else [], "source": "FRED (OECD CCI)"}
 
         all_data[country] = d
     return all_data
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def latest(records, key="value"):
-    return records[-1][key] if records else None
+def latest(records):
+    return records[-1]["value"] if records else None
 
-def delta(records, key="value"):
+def delta(records):
     if records and len(records) >= 2:
-        return records[-1][key] - records[-2][key]
+        return records[-1]["value"] - records[-2]["value"]
     return None
 
 def fmt(val, decimals=2, suffix="%"):
@@ -191,16 +205,22 @@ def fmt(val, decimals=2, suffix="%"):
         return "N/A"
     return f"{val:.{decimals}f}{suffix}"
 
+def dark_fig(fig):
+    fig.update_layout(
+        plot_bgcolor="#1e1e2e", paper_bgcolor="#1e1e2e", font_color="#e2e8f0",
+        margin=dict(t=40, b=20, l=10, r=10), showlegend=False,
+    )
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(gridcolor="#374151")
+    return fig
+
 # ── AI Executive Summary ──────────────────────────────────────────────────────
 
 def generate_exec_summary(all_data, country, anthropic_key):
     client = anthropic.Anthropic(api_key=anthropic_key)
     snapshot = {}
     for indicator, info in all_data.get(country, {}).items():
-        snapshot[indicator] = {
-            "latest": latest(info["data"]),
-            "change_vs_prior": delta(info["data"]),
-        }
+        snapshot[indicator] = {"latest": latest(info["data"]), "recent_change": delta(info["data"])}
     snapshot["Interest Rate (%)"] = INTEREST_RATES.get(country)
 
     prompt = f"""You are a senior macro analyst writing a concise executive briefing for a credit risk team.
@@ -211,43 +231,18 @@ Data as of: {RATE_DATE}
 Indicators:
 {json.dumps(snapshot, indent=2)}
 
-Write a 3-paragraph executive summary (max 250 words total):
+Write a 3-paragraph executive summary (max 250 words):
 1. Overall economic health and direction
 2. Key risks or concerns for a credit team
 3. Notable positives or stabilising factors
 
-Be specific and data-driven — use the actual numbers. Plain English, no bullet points, no headers."""
+Use the actual numbers. Plain English, no bullet points, no headers."""
 
     msg = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=500,
-        messages=[{"role": "user", "content": prompt}],
+        model="claude-sonnet-4-6", max_tokens=500,
+        messages=[{"role": "user", "content": prompt}]
     )
     return msg.content[0].text
-
-# ── Chart helper ──────────────────────────────────────────────────────────────
-
-def dark_line(df, x, y, title, color="#7c3aed", hline=None):
-    fig = px.line(df, x=x, y=y, title=title, color_discrete_sequence=[color])
-    if hline is not None:
-        fig.add_hline(y=hline, line_dash="dash", line_color="#6b7280", annotation_text="Neutral")
-    fig.update_layout(
-        plot_bgcolor="#1e1e2e", paper_bgcolor="#1e1e2e", font_color="#e2e8f0",
-        margin=dict(t=40, b=20, l=10, r=10), showlegend=False,
-    )
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(gridcolor="#374151")
-    return fig
-
-def dark_bar(df, x, y, title, color="#22c55e"):
-    fig = px.bar(df, x=x, y=y, title=title, color_discrete_sequence=[color])
-    fig.update_layout(
-        plot_bgcolor="#1e1e2e", paper_bgcolor="#1e1e2e", font_color="#e2e8f0",
-        margin=dict(t=40, b=20, l=10, r=10), showlegend=False,
-    )
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(gridcolor="#374151")
-    return fig
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -256,15 +251,14 @@ with st.sidebar:
     st.divider()
 
     selected_country = st.selectbox(
-        "Select Country",
-        list(COUNTRIES.keys()),
+        "Select Country", list(COUNTRIES.keys()),
         format_func=lambda c: f"{COUNTRIES[c]['flag']} {c}",
     )
 
     st.divider()
     st.markdown("**🔑 API Keys**")
     fred_key = st.secrets.get("FRED_KEY", "") or st.text_input(
-        "FRED API Key (optional)", type="password", help="Get free key at fred.stlouisfed.org"
+        "FRED API Key", type="password", help="Get free key at fred.stlouisfed.org"
     )
     anthropic_key = st.secrets.get("ANTHROPIC_KEY", "") or st.text_input(
         "Anthropic API Key", type="password", help="Get key at console.anthropic.com"
@@ -278,20 +272,24 @@ with st.sidebar:
     st.divider()
     st.markdown("**📚 Sources**")
     st.caption("""
-- **World Bank API** — GDP, Inflation, Unemployment
-- **FRED API** — Business & Consumer Confidence (primary)
-- **OECD API** — Confidence fallback where FRED unavailable
+- **FRED API** — All macro indicators (GDP, CPI, Unemployment, Confidence)
 - **Central Banks** — Interest Rates (updated monthly)
 - **Anthropic Claude** — AI Executive Summary
+
+All economic data sourced via St. Louis Fed (FRED), which republishes OECD data.
     """)
     st.caption(f"Refreshed: {datetime.now().strftime('%d %b %Y, %H:%M')}")
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 flag = COUNTRIES[selected_country]["flag"]
 st.title(f"{flag} {selected_country} — Macro Dashboard")
-st.caption(f"Auto-fetched from World Bank, FRED & OECD APIs · Interest rates as of {RATE_DATE}")
+st.caption(f"All data via FRED API (St. Louis Fed) · Interest rates as of {RATE_DATE}")
 
-with st.spinner("Fetching latest macro data..."):
+if not fred_key:
+    st.warning("⚠️ FRED API key not found. Add it to your Streamlit secrets or enter it in the sidebar. Get a free key at fred.stlouisfed.org")
+    st.stop()
+
+with st.spinner("Fetching latest macro data from FRED..."):
     all_data = build_country_data(fred_key)
 
 cdata = all_data.get(selected_country, {})
@@ -300,9 +298,9 @@ cdata = all_data.get(selected_country, {})
 st.markdown("### Key Indicators")
 cols = st.columns(4)
 kpis = [
-    ("GDP Growth (%)",   "GDP Growth",   False),
-    ("Inflation (%)",    "Inflation",    True),
-    ("Unemployment (%)", "Unemployment", True),
+    ("GDP Growth (%)",   "GDP Growth (YoY)",  False),
+    ("Inflation (%)",    "Inflation (YoY)",   True),
+    ("Unemployment (%)", "Unemployment Rate", True),
 ]
 for i, (key, label, invert) in enumerate(kpis):
     records = cdata.get(key, {}).get("data", [])
@@ -313,46 +311,46 @@ for i, (key, label, invert) in enumerate(kpis):
         st.metric(
             label=label,
             value=fmt(val),
-            delta=f"{arrow} {fmt(abs(d) if d else None)} vs prior" if d is not None else "N/A",
+            delta=f"{arrow} {fmt(abs(d) if d is not None else None)} vs prior" if d is not None else "N/A",
         )
 with cols[3]:
     st.metric(label="Interest Rate", value=fmt(INTEREST_RATES.get(selected_country)), delta=f"as of {RATE_DATE}")
 
-# ── Confidence indicators ─────────────────────────────────────────────────────
+# ── Confidence ────────────────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Business & Consumer Confidence")
-
-if not fred_key:
-    st.warning("Add your FRED API key in the sidebar to load confidence data — it's free at fred.stlouisfed.org")
+st.caption("OECD Confidence Index via FRED — values above 100 = above-average confidence")
 
 conf_cols = st.columns(2)
 for i, key in enumerate(["Business Confidence", "Consumer Confidence"]):
     info    = cdata.get(key, {})
     records = info.get("data", [])
-    source  = info.get("source", "")
     with conf_cols[i]:
         if records:
             df  = pd.DataFrame(records)
-            x_col = "date" if "date" in df.columns else "period"
-            fig = dark_line(df, x_col, "value", key, hline=100 if source != "OECD" else None)
-            st.plotly_chart(fig, use_container_width=True)
-            latest_period = records[-1].get("date", records[-1].get("period", ""))
-            st.caption(f"Source: {source} · Latest: {latest_period}")
+            fig = px.line(df, x="date", y="value", title=key, color_discrete_sequence=["#7c3aed"],
+                          labels={"date": "", "value": "Index"})
+            fig.add_hline(y=100, line_dash="dash", line_color="#6b7280", annotation_text="Neutral (100)")
+            st.plotly_chart(dark_fig(fig), use_container_width=True)
+            st.caption(f"Source: {info.get('source', 'FRED')} · Latest: {records[-1]['date'][:7]}")
         else:
-            st.info(f"No {key} data available for {selected_country}. "
-                    f"{'Add your FRED API key above.' if not fred_key else 'Data may not be published for this country.'}")
+            st.info(f"No {key} data returned for {selected_country}. The FRED series may not exist for this country.")
 
 # ── GDP & Inflation ───────────────────────────────────────────────────────────
 st.divider()
-st.markdown("### GDP Growth & Inflation Trends")
+st.markdown("### GDP Growth & Inflation")
 trend_cols = st.columns(2)
 for i, (key, color) in enumerate([("GDP Growth (%)", "#22c55e"), ("Inflation (%)", "#f59e0b")]):
     records = cdata.get(key, {}).get("data", [])
     with trend_cols[i]:
         if records:
-            df = pd.DataFrame(records)
-            st.plotly_chart(dark_bar(df, "year", "value", key, color), use_container_width=True)
-            st.caption(f"Source: World Bank · Latest: {records[-1]['year']}")
+            df  = pd.DataFrame(records)
+            fig = px.line(df, x="date", y="value", title=key,
+                          color_discrete_sequence=[color], labels={"date": "", "value": "%"})
+            fig.add_hline(y=0, line_dash="dash", line_color="#6b7280")
+            st.plotly_chart(dark_fig(fig), use_container_width=True)
+            src = cdata.get(key, {}).get("source", "FRED")
+            st.caption(f"Source: {src} · Latest: {records[-1]['date'][:7]}")
         else:
             st.info(f"No data available for {key}")
 
@@ -362,17 +360,18 @@ st.markdown("### Unemployment Rate")
 unemp_records = cdata.get("Unemployment (%)", {}).get("data", [])
 if unemp_records:
     df_u = pd.DataFrame(unemp_records)
-    fig_u = dark_line(df_u, "year", "value", "Unemployment (%)", color="#ef4444")
+    fig_u = px.line(df_u, x="date", y="value", color_discrete_sequence=["#ef4444"],
+                    labels={"date": "", "value": "Unemployment (%)"})
     fig_u.update_layout(height=300)
-    st.plotly_chart(fig_u, use_container_width=True)
-    st.caption("Source: World Bank")
+    st.plotly_chart(dark_fig(fig_u), use_container_width=True)
+    st.caption(f"Source: {cdata.get('Unemployment (%)', {}).get('source', 'FRED')}")
 
 # ── Cross-country snapshot ────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Cross-Country Snapshot")
 rows = []
 for country, meta in COUNTRIES.items():
-    cd = all_data.get(country, {})
+    cd  = all_data.get(country, {})
     bci = cd.get("Business Confidence", {}).get("data", [])
     cci = cd.get("Consumer Confidence", {}).get("data", [])
     rows.append({
@@ -400,12 +399,12 @@ if anthropic_key:
             except Exception as e:
                 st.error(f"Could not generate summary: {e}")
 else:
-    st.info("Enter your Anthropic API key in the sidebar to enable AI-generated executive summaries.")
+    st.info("Add your Anthropic API key in the sidebar to enable AI-generated executive summaries.")
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
 st.caption("""
-**Data Sources:** World Bank Open Data API · FRED (St. Louis Fed) · OECD API · Central Bank websites · Anthropic Claude  
-**Refresh cycle:** Data auto-refreshes every 24 hours · Interest rates updated manually each month  
-**Confidence index:** OECD Business/Consumer Confidence Index — values above 100 indicate above-average confidence
+**Data Sources:** All economic data via FRED (Federal Reserve Bank of St. Louis), which republishes OECD datasets.  
+Interest rates sourced from central bank websites and updated manually each month.  
+**Refresh cycle:** Data auto-refreshes every 24 hours.
 """)
