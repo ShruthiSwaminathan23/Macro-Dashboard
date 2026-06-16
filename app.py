@@ -84,15 +84,15 @@ FRED_SERIES = {
     },
     "Australia": {
         "gdp":     "AUSGDPRQPSMEI",
-        "cpi":     "AUSCPIALLMINMEI",
+        "cpi":     "AUSCPIALLQINMEI",
         "unemp":   "LRHUTTTTAUM156S",
         "bci":     "BSCICP02AUQ460S",
         "cci":     "CSCICP02AUM460S",
     },
     "New Zealand": {
         "gdp":     "NZLGDPRQPSMEI",
-        "cpi":     "NZLCPIALLMINMEI",
-        "unemp":   "LRHUTTTTNZM156S",
+        "cpi":     "NZLCPIALLQINMEI",
+        "unemp":   "LRHUTTTTNZQ156S",
         "bci":     "BSCICP02NZQ460S",
         "cci":     "CSCICP02NZM460S",
     },
@@ -165,9 +165,12 @@ def build_all(api_key):
         # GDP — already pre-calculated YoY growth rate from OECD via FRED
         gdp = fetch_fred(ids["gdp"], api_key, freq="q")
 
-        # CPI — monthly index → YoY inflation
-        cpi_raw = fetch_fred(ids["cpi"], api_key, freq="m")
-        cpi = yoy_pct(cpi_raw, lag=12)
+        # CPI — AUS & NZ publish quarterly only; all others monthly
+        quarterly_countries = ("Australia", "New Zealand")
+        cpi_freq = "q" if country in quarterly_countries else "m"
+        cpi_lag  = 4  if country in quarterly_countries else 12
+        cpi_raw = fetch_fred(ids["cpi"], api_key, freq=cpi_freq)
+        cpi = yoy_pct(cpi_raw, lag=cpi_lag)
 
         # Unemployment — already a rate
         unemp = fetch_fred(ids["unemp"], api_key, freq="m")
