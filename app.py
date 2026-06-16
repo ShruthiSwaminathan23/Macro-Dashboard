@@ -94,7 +94,7 @@ FRED_SERIES = {
         "cpi":     "NZLCPIALLQINMEI",
         "unemp":   "LRHUTTTTNZQ156S",
         "bci":     "BSCICP02NZQ460S",
-        "cci":     "CSCICP02NZM460S",
+        "cci":     None,              # OECD does not publish CCI for NZ
     },
     "Mexico": {
         "gdp":     "MEXGDPRQPSMEI",
@@ -283,7 +283,11 @@ with c4:
 # ── Confidence charts ─────────────────────────────────────────────────────────
 st.divider()
 st.markdown("### Business & Consumer Confidence")
-st.caption("OECD composite indicators via FRED — percentage balance (positive = net optimism)")
+st.caption("""
+**How these are calculated:** Monthly surveys of firms (BCI) and households (CCI) by national statistics offices.  
+Respondents say whether conditions are better, same, or worse. The result is a **percentage balance** = % positive minus % negative responses.  
+**0 = neutral** · Positive = net optimism · Negative = net pessimism · Source: OECD via FRED (St. Louis Fed)
+""")
 
 col_b, col_c = st.columns(2)
 for col, key in [(col_b, "Business Confidence"), (col_c, "Consumer Confidence")]:
@@ -298,7 +302,10 @@ for col, key in [(col_b, "Business Confidence"), (col_c, "Consumer Confidence")]
             st.plotly_chart(dark(fig), use_container_width=True)
             st.caption(f"Source: {src} · Latest: {recs[-1]['date'][:7]} = {fmt(latest(recs), sfx='')}")
         else:
-            st.info(f"No {key} data returned for {selected}.")
+            if selected == "New Zealand" and key == "Consumer Confidence":
+                st.info("Consumer Confidence not available for New Zealand — the OECD does not publish a composite CCI survey for NZ.")
+            else:
+                st.info(f"No {key} data returned for {selected}.")
 
 # ── GDP & Inflation ───────────────────────────────────────────────────────────
 st.divider()
